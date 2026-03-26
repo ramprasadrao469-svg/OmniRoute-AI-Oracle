@@ -1,6 +1,10 @@
 # OmniRoute AI: Predictive Maritime Supply Chain Oracle
 
 ## 📌 Executive Summary
+<img width="1905" height="843" alt="Screenshot 2026-03-26 195632" src="https://github.com/user-attachments/assets/1b46c529-0477-4620-9875-2ac56dd83b9c" />
+<img width="1906" height="864" alt="Screenshot 2026-03-26 195621" src="https://github.com/user-attachments/assets/fceb2ee4-9560-45bc-a2d7-37eb6d51522f" />
+<img width="1872" height="827" alt="Screenshot 2026-03-26 195538" src="https://github.com/user-attachments/assets/aff20f42-8fcf-43b3-a180-54e0e6b50c8f" />
+<img width="1903" height="864" alt="Screenshot 2026-03-26 195523" src="https://github.com/user-attachments/assets/33df8e98-9398-4e5a-a31b-4243a700e35b" />
 
 OmniRoute AI is a predictive logistics tool designed to mitigate global supply chain disruptions. Traditional shipping dashboards track vessels *after* they are delayed. OmniRoute uses Generative AI to analyze live maritime geopolitical and weather data, assigning a predictive **Disruption Risk Score (1-10)** to specific oceanic corridors before ships even leave the port.
 
