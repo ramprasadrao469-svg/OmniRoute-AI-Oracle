@@ -1,20 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# OmniRoute AI: Predictive Maritime Supply Chain Oracle
 
-# Run and deploy your AI Studio app
+## 📌 Executive Summary
 
-This contains everything you need to run your app locally.
+OmniRoute AI is a predictive logistics tool designed to mitigate global supply chain disruptions. Traditional shipping dashboards track vessels *after* they are delayed. OmniRoute uses Generative AI to analyze live maritime geopolitical and weather data, assigning a predictive **Disruption Risk Score (1-10)** to specific oceanic corridors before ships even leave the port.
 
-View your app in AI Studio: https://ai.studio/apps/103d66f3-4be8-455c-bcc8-c15cbd53fc55
+**Target Use Case:** Optimizing the semiconductor export corridor between the Port of Visakhapatnam (India) and the Port of Kaohsiung (Taiwan).
 
-## Run Locally
+## ⚙️ Systems Architecture
 
-**Prerequisites:**  Node.js
+This project utilizes a decoupled, microservices-based architecture:
 
+*   **Data Ingestion:** Asynchronous RSS parsing of global maritime intelligence feeds (e.g., gCaptain, Supply Chain Dive).
+*   **AI Processing:** RESTful FastAPI backend utilizing Large Language Models for unstructured text evaluation and strict JSON schema generation.
+*   **Data Persistence:** NoSQL database (Google Firestore) for saving historical route analyses and caching LLM responses to reduce API latency.
+*   **Frontend Client:** React.js dashboard utilizing Leaflet mapping for spatial route visualization.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🚀 Core API Endpoints
+
+The core risk evaluation is handled via a low-latency POST route.
+`POST /api/v1/risk/analyze`
+
+**Request Payload:**
+{
+  "source_port": "Visakhapatnam",
+  "destination_port": "Kaohsiung"
+}
+
+**AI-Generated JSON Response:**
+{
+  "route": "Visakhapatnam to Kaohsiung",
+  "overall_risk_score": 7,
+  "primary_threat_category": "Geopolitical / Weather",
+  "executive_summary": "Typhoon warnings in the South China Sea combined with port congestion in transshipment hubs indicate a high probability of delays.",
+  "recommended_action": "Reroute to alternative port or increase buffer stock for pending semiconductor shipments."
+}
