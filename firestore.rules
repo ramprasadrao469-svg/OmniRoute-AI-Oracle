@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: chatSessions
+    // Document ID: {sessionId}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - title: string (optional)
+    //   - createdAt: timestamp (required, immutable)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: chatSessions/{sessionId}/messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - sessionId: string (required, immutable)
+    //   - userId: string (required, immutable)
+    //   - role: string (required, 'user' or 'model')
+    //   - text: string (required)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: riskAnalyses
+    // Document ID: {analysisId}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - title: string (required)
+    //   - sourcePortName: string (required)
+    //   - destPortName: string (required)
+    //   - riskScore: number (required)
+    //   - notes: string (optional)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['uid', 'email', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             request.resource.data.uid == request.auth.uid &&
+             request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() < 100 &&
+             isValidOptionalString('displayName', 0, 100) &&
+             isValidOptionalString('photoURL', 0, 500) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidChatSession() {
+      return hasRequiredFields(['userId', 'createdAt', 'updatedAt']) &&
+             hasOnlyAllowedFields(['userId', 'title', 'createdAt', 'updatedAt']) &&
+             request.resource.data.userId == request.auth.uid &&
+             isValidOptionalString('title', 0, 200) &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(sessionId) {
+      return hasRequiredFields(['sessionId', 'userId', 'role', 'text', 'createdAt']) &&
+             hasOnlyAllowedFields(['sessionId', 'userId', 'role', 'text', 'createdAt']) &&
+             request.resource.data.sessionId == sessionId &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.role in ['user', 'model'] &&
+             validStringLength('text', 0, 10000) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidRiskAnalysis() {
+      return hasRequiredFields(['userId', 'title', 'sourcePortName', 'destPortName', 'riskScore', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'title', 'sourcePortName', 'destPortName', 'riskScore', 'notes', 'createdAt']) &&
+             request.resource.data.userId == request.auth.uid &&
+             validStringLength('title', 1, 200) &&
+             validStringLength('sourcePortName', 1, 200) &&
+             validStringLength('destPortName', 1, 200) &&
+             request.resource.data.riskScore is number &&
+             request.resource.data.riskScore >= 0 && request.resource.data.riskScore <= 10 &&
+             isValidOptionalString('notes', 0, 5000) &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser();
+      allow update: if isOwner(userId) && isValidUser() && areImmutableFieldsUnchanged(['uid', 'createdAt']);
+    }
+
+    match /chatSessions/{sessionId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidChatSession();
+      allow update: if isDocOwner() && isValidChatSession() && areImmutableFieldsUnchanged(['userId', 'createdAt']);
+      allow delete: if isDocOwner();
+      
+      match /messages/{messageId} {
+        // Only allow reading messages if the user owns the parent session
+        allow read: if isAuthenticated() && get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid && isValidChatMessage(sessionId);
+        // Messages are immutable
+        allow update: if false;
+        allow delete: if isAuthenticated() && get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid;
+      }
+    }
+
+    match /riskAnalyses/{analysisId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidRiskAnalysis();
+      allow update: if isDocOwner() && isValidRiskAnalysis() && areImmutableFieldsUnchanged(['userId', 'createdAt']);
+      allow delete: if isDocOwner();
+    }
+  }
+}
